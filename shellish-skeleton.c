@@ -307,6 +307,35 @@ int prompt(struct command_t *command) {
   return SUCCESS;
 }
 
+void process_cut_line(char *line, char *delim, char *fields_str) {
+    char *tokens[100];
+    int count = 0;
+    char *temp_line = strdup(line);
+
+    char *running = temp_line;
+    char *token;
+    while ((token = strsep(&running, delim)) != NULL && count < 100) {
+        tokens[count++] = token;
+    }
+
+    char *f_copy = strdup(fields_str);
+    char *f_ptr = f_copy;
+    char *f_token;
+    bool first = true;
+
+    while ((f_token = strsep(&f_ptr, ",")) != NULL) {
+        int idx = atoi(f_token) - 1; 
+        if (idx >= 0 && idx < count) {
+            if (!first) printf("%s", delim); 
+            printf("%s", tokens[idx]);
+            first = false;
+        }
+    }
+    free(temp_line);
+    free(f_copy);
+}
+
+
 int process_command(struct command_t *command) {
   int r;
   if (strcmp(command->name, "") == 0)
@@ -323,6 +352,33 @@ int process_command(struct command_t *command) {
       return SUCCESS;
     }
   }
+ 
+  if (strcmp(command->name, "cut") == 0) {
+    char *delim = "\t"; 
+    char *fields_str = NULL;
+
+    for (int i = 1; i < command->arg_count - 1; i++) {
+        if (strcmp(command->args[i], "-d") == 0 || strcmp(command->args[i], "--delimiter") == 0) {
+            delim = command->args[i + 1];
+        } else if (strcmp(command->args[i], "-f") == 0 || strcmp(command->args[i], "--fields") == 0) {
+            fields_str = command->args[i + 1];
+        }
+    }
+
+    if (!fields_str) {
+        printf("cut: -f (fields) parameter is mandotory\n");
+        return SUCCESS;
+    }
+
+    char line[1024];
+    while (fgets(line, sizeof(line), stdin)) {
+        line[strcspn(line, "\n")] = 0; 
+        
+        process_cut_line(line, delim, fields_str);
+        printf("\n");
+    }
+    return SUCCESS;
+}
 
   pid_t pid = fork();
   if (pid == 0) // child
