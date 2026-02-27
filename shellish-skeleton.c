@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -336,6 +337,43 @@ int process_command(struct command_t *command) {
 
     // TODO: do your own exec with path resolving using execv()
     // do so by replacing the execvp call below
+    for (int i = 1; i < 3; i++){
+        if (command->redirects[i]) {
+            char *fname = command->redirects[i];
+            while(*fname == ' ') fname++;
+
+            int flags = O_WRONLY | O_CREAT;
+            if (i == 1) flags |= O_TRUNC;  
+            else flags |= O_APPEND;
+            int fd = open(fname, flags, 0644);
+        if (fd < 0) {
+            perror("Input file error");
+            exit(1);
+        }
+        dup2(fd, STDIN_FILENO);  
+        close(fd);
+        }
+    }
+    if (command->redirects[1]) {
+        int fd = open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0) {
+            perror("Output file error");
+            exit(1);
+        }
+        dup2(fd, STDOUT_FILENO); 
+        close(fd);
+    }
+
+    if (command->redirects[2]) {
+        int fd = open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd < 0) {
+            perror("Attachment file error");
+            exit(1);
+        }
+        dup2(fd, STDOUT_FILENO);  
+        close(fd);
+    }
+
     char *path_env = getenv("PATH");
     char *path_copy = strdup(path_env);
     char *token = strtok(path_copy, ":");
@@ -353,23 +391,20 @@ int process_command(struct command_t *command) {
         token = strtok(NULL, ":");
     }
     
-    if (!found) {
-        execv(command->name, command->args);
-    }
+    execv(command->name, command->args);
+   
     printf("-%s: %s: command not found\n", sysname, command->name);
+    free(path_copy);
     exit(127);
-  } else if (pid > 0) {
+  } else {
     // TODO: implement background processes here
     //  wait(0); // wait for child process to finish
         if (!command->background) {
             waitpid(pid, NULL, 0); // Arka planda değilse çocuğu bekle 
-        } else {
-            printf("[Process running in background with PID: %d]\n", pid);
-        }
+        } 
         return SUCCESS;
     }
-    return SUCCESS;
-  }
+  
 }
 
 int main() {
