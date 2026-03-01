@@ -1,3 +1,4 @@
+#include <time.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <signal.h>
@@ -442,9 +443,33 @@ int process_command(struct command_t *command) {
                     }
                } 
                closedir(dp);
+            }
         }
         waitpid(chat_pid, NULL, 0);
     
+    return SUCCESS;
+}
+if (strcmp(command->name, "finfo") == 0) {
+    if (command->arg_count < 2) {
+        printf("Usage: finfo <filename>\n");
+        return SUCCESS;
+    }
+
+    struct stat file_stat;
+    if (stat(command->args[1], &file_stat) == -1) {
+        perror("finfo error");
+        return SUCCESS;
+    }
+
+    printf("--------------------------------------\n");
+    printf("  File Information: %s\n", command->args[1]);
+    printf("--------------------------------------\n");
+    printf("Size:          %lld bytes\n", (long long)file_stat.st_size);
+    printf("Permissions:   %o (octal)\n", file_stat.st_mode & 0777);
+    printf("Owner ID:      %d\n", file_stat.st_uid);
+    printf("Last modified: %s", ctime(&file_stat.st_mtime));
+    printf("--------------------------------------\n");
+
     return SUCCESS;
 }
   pid_t pid = fork();
@@ -455,7 +480,7 @@ int process_command(struct command_t *command) {
     // execvpe(command->name, command->args, environ); // exec+args+path+environ
 
     /// This shows how to do exec with auto-path resolve
-    // add a NULL argument to the end of args, and the name to the beginning
+    // add a NULLi argument to the end of args, and the name to the beginning
     // as required by exec
 
     // TODO: do your own exec with path resolving using execv()
@@ -527,7 +552,7 @@ int process_command(struct command_t *command) {
         } 
         return SUCCESS;
     }
-}
+
 return SUCCESS;  
 }
 
