@@ -1,0 +1,5 @@
+COMP_304_Project_1___Spring_2026 (1).pdf
+list.txt
+README.md
+shellish-skeleton
+shellish-skeleton.c

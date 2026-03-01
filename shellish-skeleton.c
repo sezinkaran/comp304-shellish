@@ -1,3 +1,6 @@
+#include <sys/stat.h>
+#include <dirent.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -349,8 +352,8 @@ int process_command(struct command_t *command) {
       r = chdir(command->args[1]);
       if (r == -1)
         printf("-%s: %s: %s\n", sysname, command->name, strerror(errno));
-      return SUCCESS;
-    }
+    }     
+    return SUCCESS; 
   }
  
   if (strcmp(command->name, "cut") == 0) {
@@ -378,8 +381,72 @@ int process_command(struct command_t *command) {
         printf("\n");
     }
     return SUCCESS;
-}
+  }
 
+    if (strcmp(command->name, "chatroom") == 0) {
+        if (command->arg_count < 3) {
+            printf("Use: chatroom <roomname> <username>\n");
+            return SUCCESS;
+        }   
+
+        char *room = command->args[1];
+        char *user = command->args[2];
+        char room_path[256], user_pipe[256];
+
+        sprintf(room_path, "/tmp/chatroom-%s", room);
+        mkdir(room_path, 0777); 
+
+        sprintf(user_pipe, "%s/%s", room_path, user);
+        mkfifo(user_pipe, 0666);
+
+        printf("Welcome to %s!\n", room);
+        pid_t chat_pid = fork();
+        if (chat_pid == 0) {
+            int fd = open(user_pipe, O_RDONLY);
+            char buf[1024];
+            while (1) {
+                int n = read(fd, buf, sizeof(buf) - 1);
+                if (n > 0) {
+                    buf[n] = '\0';
+                    printf("\n%s\n[%s] %s > ", buf, room, user);
+                    fflush(stdout);
+                }
+            }
+            exit(0);
+
+        } else {
+            char msg[1024], full_msg[1200];
+            while (1) {
+                printf("[%s] %s > ", room, user);
+                if (fgets(msg, sizeof(msg), stdin) == NULL) break;
+                msg[strcspn(msg, "\n")] = 0;
+
+                if (strcmp(msg, "exit") == 0) {
+                    kill(chat_pid, SIGKILL); 
+                    break;
+                }
+
+                sprintf(full_msg, "[%s] %s: %s", room, user, msg);
+
+                struct dirent *entry;
+                DIR *dp = opendir(room_path);
+                while ((entry = readdir(dp))) {
+                    if (entry->d_type == DT_FIFO && strcmp(entry->d_name, user) != 0) {
+                        char target_path[512];
+                        sprintf(target_path, "%s/%s", room_path, entry->d_name);
+                        int target_fd = open(target_path, O_WRONLY | O_NONBLOCK);
+                        if (target_fd != -1) {
+                            write(target_fd, full_msg, strlen(full_msg));
+                            close(target_fd);
+                        }
+                    }
+               } 
+               closedir(dp);
+        }
+        waitpid(chat_pid, NULL, 0);
+    
+    return SUCCESS;
+}
   pid_t pid = fork();
   if (pid == 0) // child
   {
@@ -460,7 +527,8 @@ int process_command(struct command_t *command) {
         } 
         return SUCCESS;
     }
-  
+}
+return SUCCESS;  
 }
 
 int main() {
